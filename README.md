@@ -1,17 +1,17 @@
-# django-beat-periodic
+# django-beat-periodic 🥁
 
 [![PyPI version](https://img.shields.io/pypi/v/django-beat-periodic.svg)](https://pypi.org/project/django-beat-periodic/)
 [![PyPI downloads](https://img.shields.io/pypi/dm/django-beat-periodic.svg)](https://pypi.org/project/django-beat-periodic/)
 
 Auto-populate [django-celery-beat](https://github.com/celery/django-celery-beat) `PeriodicTask` objects with a simple decorator — no manual admin setup required.
 
-## Installation
+## Installation 📥
 
 ```bash
 pip install django-beat-periodic
 ```
 
-## Why Use This?
+## Why Use This? 🤔
 
 ### 1. Periodic Tasks as Code — No Admin Required
 
@@ -53,7 +53,7 @@ When you remove a `@periodic_task` decorator from your code, `django-beat-period
 > [!NOTE]
 > It only deletes tasks that were originally created by the package (marked with a specific description). Manually created tasks in the Django admin are never touched.
 
-## Quick Start
+## Quick Start 🚀
 
 ### 1. Add to `INSTALLED_APPS`
 
@@ -88,13 +88,13 @@ def expensive_cleanup():
     cleanup_old_records()
 ```
 
-### 3. Done!
+### 3. Done! ✨
 
 On Django startup, `django_beat_periodic` will automatically create or update the
 corresponding `PeriodicTask`, `IntervalSchedule`, and `CrontabSchedule` rows in your
 database. The Celery Beat scheduler picks them up immediately.
 
-## Decorator Options
+## Decorator Options ⚙️
 
 | Parameter  | Type                    | Description                                       |
 | ---------- | ----------------------- | ------------------------------------------------- |
@@ -107,20 +107,20 @@ database. The Celery Beat scheduler picks them up immediately.
 | `args`     | `list`                  | Positional arguments for the task                 |
 | `kwargs`   | `dict`                  | Keyword arguments for the task                    |
 
-## How It Works
+## How It Works 🛠️
 
 1. `@periodic_task` registers metadata (schedule, enabled, etc.) in an internal registry and wraps the function with Celery's `@app.task`.
 2. When Django starts, `DjangoBeatPeriodicConfig.ready()` calls `sync_periodic_tasks()`.
 3. `sync_periodic_tasks()` iterates the registry and creates or updates `django_celery_beat` database objects, only writing when something actually changed.
 
-## Requirements
+## Requirements 📋
 
 - Python ≥ 3.9
 - Django ≥ 3.2
 - Celery ≥ 5.0
 - django-celery-beat ≥ 2.0
 
-## License
+## License 📄
 
 MIT
 
