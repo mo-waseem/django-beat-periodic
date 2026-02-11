@@ -1,0 +1,80 @@
+# django-beat-periodic
+
+Auto-populate [django-celery-beat](https://github.com/celery/django-celery-beat) `PeriodicTask` objects with a simple decorator — no manual admin setup required.
+
+## Installation
+
+```bash
+pip install django-beat-periodic
+```
+
+## Quick Start
+
+### 1. Add to `INSTALLED_APPS`
+
+```python
+INSTALLED_APPS = [
+    # ...
+    "django_celery_beat",
+    "django_beat_periodic",   # must come AFTER django_celery_beat
+    # ...
+]
+```
+
+### 2. Decorate Your Tasks
+
+```python
+# myapp/tasks.py
+from django_beat_periodic import periodic_task
+
+@periodic_task(interval=60)
+def heartbeat():
+    """Runs every 60 seconds."""
+    print("alive!")
+
+@periodic_task(crontab="*/5 * * * *")
+def generate_report():
+    """Runs every 5 minutes (cron-style)."""
+    build_report()
+
+@periodic_task(interval=300, enabled=False)
+def expensive_cleanup():
+    """Registered but disabled by default."""
+    cleanup_old_records()
+```
+
+### 3. Done!
+
+On Django startup, `django_beat_periodic` will automatically create or update the
+corresponding `PeriodicTask`, `IntervalSchedule`, and `CrontabSchedule` rows in your
+database. The Celery Beat scheduler picks them up immediately.
+
+## Decorator Options
+
+| Parameter  | Type                    | Description                                       |
+| ---------- | ----------------------- | ------------------------------------------------- |
+| `interval` | `int` or `timedelta`    | Run every N seconds (or a timedelta)              |
+| `crontab`  | `str` or `dict`         | Cron expression (`"* * * * *"`) or dict of fields |
+| `enabled`  | `bool` (default `True`) | Whether the task is enabled                       |
+| `name`     | `str`                   | Custom task name (defaults to module path)        |
+| `queue`    | `str`                   | Celery queue to route to                          |
+| `priority` | `int`                   | Task priority                                     |
+| `args`     | `list`                  | Positional arguments for the task                 |
+| `kwargs`   | `dict`                  | Keyword arguments for the task                    |
+
+## How It Works
+
+1. `@periodic_task` registers metadata (schedule, enabled, etc.) in an internal registry and wraps the function with Celery's `@app.task`.
+2. When Django starts, `DjangoBeatPeriodicConfig.ready()` calls `sync_periodic_tasks()`.
+3. `sync_periodic_tasks()` iterates the registry and creates or updates `django_celery_beat` database objects, only writing when something actually changed.
+
+## Requirements
+
+- Python ≥ 3.9
+- Django ≥ 3.2
+- Celery ≥ 5.0
+- django-celery-beat ≥ 2.0
+
+## License
+
+MIT
