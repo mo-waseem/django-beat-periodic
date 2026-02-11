@@ -120,6 +120,30 @@ database. The Celery Beat scheduler picks them up immediately.
 - Celery ≥ 5.0
 - django-celery-beat ≥ 2.0
 
+## Contributing 🤝
+
+Contributions are welcome! To set up the project locally:
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/waseemkntar/django-beat-periodic.git
+   cd django-beat-periodic
+   ```
+
+2. Install dependencies (using `uv` or `pip`):
+   ```bash
+   uv venv
+   source .venv/bin/activate
+   uv pip install -e ".[test]"
+   ```
+
+3. Run tests to ensure everything is working:
+   ```bash
+   pytest
+   ```
+
+Feel free to open an issue or submit a pull request!
+
 ## License 📄
 
 MIT
