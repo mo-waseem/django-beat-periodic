@@ -194,3 +194,56 @@ class TestSyncPeriodicTasks:
 
         pt.refresh_from_db()
         assert pt.enabled is False
+
+    def test_stale_tasks_are_deleted(self):
+        """Tasks removed from code should be deleted from the DB on next sync."""
+        import django_beat_periodic.sync as sync_mod
+
+        from django_celery_beat.models import PeriodicTask
+
+        from django_beat_periodic.sync import sync_periodic_tasks
+
+        sync_periodic_tasks()
+        assert PeriodicTask.objects.count() == 5
+
+        # Simulate removing all decorators except the first one
+        PERIODIC_TASKS.clear()
+        from django_beat_periodic.decorators import periodic_task
+
+        @periodic_task(interval=30)
+        def every_30_seconds():
+            return "tick"
+
+        sync_mod._already_synced = False
+        sync_periodic_tasks()
+
+        # Only the one remaining task should survive
+        assert PeriodicTask.objects.count() == 1
+
+    def test_manual_tasks_are_not_deleted(self):
+        """Tasks created manually (no managed marker) should not be removed."""
+        import django_beat_periodic.sync as sync_mod
+
+        from django_celery_beat.models import IntervalSchedule, PeriodicTask
+
+        from django_beat_periodic.sync import sync_periodic_tasks
+
+        sync_periodic_tasks()
+
+        # Create a manual task (no managed description)
+        schedule, _ = IntervalSchedule.objects.get_or_create(
+            every=60, period=IntervalSchedule.SECONDS
+        )
+        PeriodicTask.objects.create(
+            name="manually-created-task",
+            task="some.manual.task",
+            interval=schedule,
+        )
+
+        assert PeriodicTask.objects.count() == 6
+
+        # Re-sync — the manual task should survive
+        sync_mod._already_synced = False
+        sync_periodic_tasks()
+
+        assert PeriodicTask.objects.filter(name="manually-created-task").exists()

@@ -45,6 +45,13 @@ New team members or fresh deployments get the correct periodic tasks automatical
 
 The decorator is the authoritative definition. If someone changes a task's settings in the admin, the next deployment will reset it to match the code — preventing configuration drift.
 
+### 6. Automatic Cleanup of Stale Tasks
+
+When you remove a `@periodic_task` decorator from your code, `django-beat-periodic` automatically deletes the corresponding `PeriodicTask` row from the database on the next startup. This keeps your database clean and ensures no ghost tasks are running.
+
+> [!NOTE]
+> It only deletes tasks that were originally created by the package (marked with a specific description). Manually created tasks in the Django admin are never touched.
+
 ## Quick Start
 
 ### 1. Add to `INSTALLED_APPS`

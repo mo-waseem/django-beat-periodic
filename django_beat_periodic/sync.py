@@ -8,6 +8,11 @@ from django_beat_periodic.registry import PERIODIC_TASKS
 
 logger = logging.getLogger("django_beat_periodic")
 
+# Marker used in PeriodicTask.description to identify tasks managed by this
+# package.  Only rows carrying this marker will be auto-deleted when the
+# corresponding @periodic_task decorator is removed from the code.
+MANAGED_DESCRIPTION = "Managed by django-beat-periodic"
+
 # Guard against duplicate syncs in dev (auto-reload runs ready() twice).
 _already_synced = False
 
@@ -36,6 +41,15 @@ def sync_periodic_tasks() -> None:
         PeriodicTask,
         PeriodicTasks,
     )
+
+    # The tables may not exist yet (before first migration or during test
+    # collection).  Silently skip in that case.
+    try:
+        PeriodicTask.objects.count()
+    except Exception:
+        _already_synced = False
+        logger.debug("django_celery_beat tables do not exist yet — skipping sync.")
+        return
 
     logger.info("Synchronizing periodic tasks with the database...")
 
@@ -106,6 +120,7 @@ def sync_periodic_tasks() -> None:
         defaults = {
             "task": task_path,
             "enabled": enabled,
+            "description": MANAGED_DESCRIPTION,
             "args": json.dumps(kwargs.pop("args", [])),
             "kwargs": json.dumps(kwargs.pop("kwargs", {})),
             "queue": kwargs.pop("queue", None),
@@ -132,6 +147,24 @@ def sync_periodic_tasks() -> None:
                 changed_count += 1
         else:
             changed_count += 1
+
+    # ----------------------------------------------------------
+    # Remove stale tasks (decorator removed from code)
+    # ----------------------------------------------------------
+    stale_tasks = PeriodicTask.objects.filter(
+        description=MANAGED_DESCRIPTION,
+    ).exclude(name__in=active_task_names)
+
+    stale_count = stale_tasks.count()
+    if stale_count > 0:
+        stale_names = list(stale_tasks.values_list("name", flat=True))
+        stale_tasks.delete()
+        changed_count += stale_count
+        logger.info(
+            "Removed %d stale periodic task(s): %s",
+            stale_count,
+            stale_names,
+        )
 
     if changed_count > 0:
         PeriodicTasks.update_changed()
