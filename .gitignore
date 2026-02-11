@@ -175,3 +175,6 @@ awscliv2.zip
 # Packer secrets
 *.pkrvars.hcl
 .env
+
+# Publication script
+publish.sh
