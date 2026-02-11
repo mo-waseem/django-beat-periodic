@@ -1,5 +1,7 @@
 # django-beat-periodic
 
+[![PyPI version](https://img.shields.io/pypi/v/django-beat-periodic.svg)](https://pypi.org/project/django-beat-periodic/)
+
 Auto-populate [django-celery-beat](https://github.com/celery/django-celery-beat) `PeriodicTask` objects with a simple decorator — no manual admin setup required.
 
 ## Installation
