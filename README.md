@@ -126,7 +126,7 @@ Contributions are welcome! To set up the project locally:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/waseemkntar/django-beat-periodic.git
+   git clone https://github.com/mo-waseem/django-beat-periodic.git
    cd django-beat-periodic
    ```
 

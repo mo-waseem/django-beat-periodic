@@ -45,8 +45,8 @@ test = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/waseemkntar/django-beat-periodic"
-Repository = "https://github.com/waseemkntar/django-beat-periodic"
+Homepage = "https://github.com/mo-waseem/django-beat-periodic"
+Repository = "https://github.com/mo-waseem/django-beat-periodic"
 
 [tool.hatch.build.targets.wheel]
 packages = ["django_beat_periodic"]
