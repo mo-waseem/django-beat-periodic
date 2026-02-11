@@ -8,6 +8,41 @@ Auto-populate [django-celery-beat](https://github.com/celery/django-celery-beat)
 pip install django-beat-periodic
 ```
 
+## Why Use This?
+
+### 1. Periodic Tasks as Code — No Admin Required
+
+Define schedules directly in your codebase. No need to manually create or update periodic tasks through the Django admin — everything is synced automatically on startup.
+
+### 2. Dynamic, Environment-Aware Scheduling
+
+Use environment variables or Django settings to change task intervals per environment — without touching the database:
+
+```python
+import os
+from django_beat_periodic import periodic_task
+
+CLEANUP_INTERVAL = int(os.getenv("CLEANUP_INTERVAL", "3600"))  # 1h default
+
+@periodic_task(interval=CLEANUP_INTERVAL)
+def cleanup_old_records():
+    ...
+```
+
+Run every 10 seconds in dev, every hour in production — same code, different env vars.
+
+### 3. Version-Controlled Schedules
+
+Since schedules live in code, every change is tracked in Git — you get full history, code review, and easy rollbacks. No more wondering who changed a task's interval in the admin.
+
+### 4. Consistent Across Team & Deployments
+
+New team members or fresh deployments get the correct periodic tasks automatically — no manual setup, no "did you remember to add the periodic task?" checklist.
+
+### 5. Single Source of Truth
+
+The decorator is the authoritative definition. If someone changes a task's settings in the admin, the next deployment will reset it to match the code — preventing configuration drift.
+
 ## Quick Start
 
 ### 1. Add to `INSTALLED_APPS`
