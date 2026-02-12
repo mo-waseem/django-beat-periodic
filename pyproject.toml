@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "django-beat-periodic"
-version = "0.4.0"
+version = "0.5.0"
 description = "Auto-populate django-celery-beat PeriodicTask objects with a simple @periodic_task decorator."
 readme = "README.md"
 license = "MIT"
@@ -42,6 +42,7 @@ dependencies = [
 test = [
     "pytest",
     "pytest-django",
+    "pytest-cov",
 ]
 
 [project.urls]
