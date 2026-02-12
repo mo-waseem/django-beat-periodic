@@ -4,6 +4,8 @@ import json
 import logging
 from datetime import timedelta
 
+from django.utils import timezone
+
 from django_beat_periodic.registry import PERIODIC_TASKS
 
 logger = logging.getLogger("django_beat_periodic")
@@ -117,6 +119,9 @@ def sync_periodic_tasks() -> None:
         # ----------------------------------------------------------
         # Build the PeriodicTask defaults
         # ----------------------------------------------------------
+        # Get start_time from kwargs or default to now
+        start_time = kwargs.pop("start_time", timezone.now())
+
         defaults = {
             "task": task_path,
             "enabled": enabled,
@@ -125,7 +130,7 @@ def sync_periodic_tasks() -> None:
             "kwargs": json.dumps(kwargs.pop("kwargs", {})),
             "queue": kwargs.pop("queue", None),
             "priority": kwargs.pop("priority", None),
-            "start_time": kwargs.pop("start_time", None),
+            "start_time": start_time,
             **schedule_kwargs,
             **kwargs,
         }
@@ -139,6 +144,9 @@ def sync_periodic_tasks() -> None:
         if not created:
             needs_update = False
             for key, value in defaults.items():
+                # Avoid resetting start_time if it's already set to a non-null value
+                if key == "start_time" and obj.start_time is not None:
+                    continue
                 if getattr(obj, key) != value:
                     setattr(obj, key, value)
                     needs_update = True

@@ -247,3 +247,33 @@ class TestSyncPeriodicTasks:
         sync_periodic_tasks()
 
         assert PeriodicTask.objects.filter(name="manually-created-task").exists()
+
+    def test_start_time_auto_populated(self):
+        """A new periodic task should have start_time set to 'now' by default."""
+        from django_celery_beat.models import PeriodicTask
+
+        from django_beat_periodic.sync import sync_periodic_tasks
+
+        sync_periodic_tasks()
+
+        for pt in PeriodicTask.objects.all():
+            assert pt.start_time is not None
+
+    def test_start_time_idempotency(self):
+        """Sync should not overwrite an existing start_time."""
+        import django_beat_periodic.sync as sync_mod
+
+        from django_celery_beat.models import PeriodicTask
+
+        from django_beat_periodic.sync import sync_periodic_tasks
+
+        sync_periodic_tasks()
+        pt = PeriodicTask.objects.first()
+        original_start_time = pt.start_time
+
+        # Reset the guard and sync again
+        sync_mod._already_synced = False
+        sync_periodic_tasks()
+
+        pt.refresh_from_db()
+        assert pt.start_time == original_start_time
