@@ -70,6 +70,35 @@ class TestListPeriodicTasksCommand:
         # --no-db should still show registry tasks without hitting the DB
         assert "heartbeat" in self._run("--no-db")
 
+    def test_shows_all_schedule_formats(self, extended_registry):
+        out = StringIO()
+        call_command("list_periodic_tasks", "--no-db", stdout=out)
+        output = out.getvalue()
+        assert "every 30s" in output
+        assert "every 5m" in output
+        assert "every 2h" in output
+        assert "cron(" in output
+
+    def test_shows_no_schedule_when_neither_interval_nor_crontab(
+        self, extended_registry
+    ):
+        from django_beat_periodic.registry import PERIODIC_TASKS
+
+        # inject a malformed entry directly
+        PERIODIC_TASKS.append(
+            {
+                "func": lambda: None,
+                "interval": None,
+                "crontab": None,
+                "enabled": True,
+                "kwargs": {},
+            }
+        )
+
+        out = StringIO()
+        call_command("list_periodic_tasks", "--no-db", stdout=out)
+        assert "no schedule" in out.getvalue()
+
 
 # ------------------------------------------------------------------ #
 # list_periodic_tasks — empty registry
@@ -196,6 +225,24 @@ class TestSyncPeriodicTasksCommand:
 
     def test_dry_run_prints_summary_line(self):
         assert "Summary" in self._run("--dry-run")
+
+    def test_dry_run_shows_update_when_schedule_type_changed(self, reset_sync_guard):
+        from django_beat_periodic.sync import sync_periodic_tasks, MANAGED_DESCRIPTION
+        from django_celery_beat.models import PeriodicTask, CrontabSchedule
+
+        sync_periodic_tasks()
+
+        # simulate a task that switched from interval to crontab in the DB
+        crontab, _ = CrontabSchedule.objects.get_or_create(
+            minute="0", hour="9", day_of_week="*", day_of_month="*", month_of_year="*"
+        )
+        PeriodicTask.objects.filter(description=MANAGED_DESCRIPTION).update(
+            interval=None, crontab=crontab
+        )
+
+        reset_sync_guard
+        output = self._run("--dry-run")
+        assert "[UPDATE]" in output
 
 
 # ------------------------------------------------------------------ #

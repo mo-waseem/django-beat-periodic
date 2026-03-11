@@ -46,3 +46,26 @@ def populated_registry(clean_registry, reset_sync_guard):
         return "clean"
 
     return clean_registry
+
+
+@pytest.fixture()
+def extended_registry(clean_registry, reset_sync_guard):
+    """Registry covering all schedule variations for utils coverage."""
+    from django_beat_periodic.decorators import periodic_task
+    from datetime import timedelta
+
+    @periodic_task(interval=30)  # seconds branch
+    def task_seconds(): ...
+
+    @periodic_task(interval=timedelta(minutes=5))  # timedelta + minutes branch
+    def task_minutes(): ...
+
+    @periodic_task(interval=timedelta(hours=2))  # hours branch
+    def task_hours(): ...
+
+    @periodic_task(
+        crontab={"minute": "0", "hour": "9", "day_of_week": "monday"}
+    )  # dict branch
+    def task_crontab_dict(): ...
+
+    return clean_registry
