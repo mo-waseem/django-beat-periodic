@@ -1,12 +1,11 @@
 """Tests for the list_periodic_tasks management command."""
 
-from io import StringIO
-from datetime import timezone as dt_timezone
 from datetime import datetime
+from datetime import timezone as dt_timezone
+from io import StringIO
 
 import pytest
-from django.core.management import call_command
-
+from django.core.management import CommandError, call_command
 
 # ------------------------------------------------------------------ #
 # list_periodic_tasks — populated registry
@@ -50,8 +49,9 @@ class TestListPeriodicTasksCommand:
         assert "synced" in self._run()
 
     def test_shows_last_run_at_when_task_has_run(self):
-        from django_beat_periodic.sync import sync_periodic_tasks, MANAGED_DESCRIPTION
         from django_celery_beat.models import PeriodicTask
+
+        from django_beat_periodic.sync import MANAGED_DESCRIPTION, sync_periodic_tasks
 
         sync_periodic_tasks()
 
@@ -136,8 +136,9 @@ class TestSyncPeriodicTasksCommand:
         assert self._run("--dry-run").count("[CREATE]") == 3
 
     def test_dry_run_shows_delete_for_stale_managed_task(self):
-        from django_beat_periodic.sync import MANAGED_DESCRIPTION
         from django_celery_beat.models import IntervalSchedule, PeriodicTask
+
+        from django_beat_periodic.sync import MANAGED_DESCRIPTION
 
         # insert a managed task that no longer exists in the registry
         schedule, _ = IntervalSchedule.objects.get_or_create(
@@ -177,8 +178,9 @@ class TestSyncPeriodicTasksCommand:
         assert "[NO-OP]" in self._run("--dry-run")
 
     def test_dry_run_shows_update_when_field_drifted(self, reset_sync_guard):
-        from django_beat_periodic.sync import sync_periodic_tasks, MANAGED_DESCRIPTION
         from django_celery_beat.models import PeriodicTask
+
+        from django_beat_periodic.sync import MANAGED_DESCRIPTION, sync_periodic_tasks
 
         sync_periodic_tasks()
 
@@ -194,3 +196,105 @@ class TestSyncPeriodicTasksCommand:
 
     def test_dry_run_prints_summary_line(self):
         assert "Summary" in self._run("--dry-run")
+
+
+# ------------------------------------------------------------------ #
+# enable_periodic_task & disable_periodic_task
+# ------------------------------------------------------------------ #
+
+
+@pytest.mark.django_db
+class TestEnablePeriodicTaskCommand:
+    @pytest.fixture()
+    def disabled_task(self):
+        from django_celery_beat.models import IntervalSchedule, PeriodicTask
+
+        from django_beat_periodic.sync import MANAGED_DESCRIPTION
+
+        schedule, _ = IntervalSchedule.objects.get_or_create(
+            every=60, period=IntervalSchedule.SECONDS
+        )
+        return PeriodicTask.objects.create(
+            name="myapp.tasks.heartbeat",
+            task="myapp.tasks.heartbeat",
+            interval=schedule,
+            description=MANAGED_DESCRIPTION,
+            enabled=False,
+        )
+
+    def test_enables_a_disabled_task(self, disabled_task):
+        call_command("enable_periodic_task", disabled_task.name, stdout=StringIO())
+        disabled_task.refresh_from_db()
+        assert disabled_task.enabled is True
+
+    def test_prints_success_message(self, disabled_task):
+        out = StringIO()
+        call_command("enable_periodic_task", disabled_task.name, stdout=out)
+        assert "has been enabled" in out.getvalue()
+
+    def test_already_enabled_prints_warning_and_does_not_save(self, disabled_task):
+        # flip it to True first
+        disabled_task.enabled = True
+        disabled_task.save()
+
+        out = StringIO()
+        call_command("enable_periodic_task", disabled_task.name, stdout=out)
+        assert "already enabled" in out.getvalue()
+
+    def test_raises_command_error_for_unknown_task(self):
+        with pytest.raises(CommandError, match="not found"):
+            call_command("enable_periodic_task", "does.not.exist", stdout=StringIO())
+
+
+@pytest.mark.django_db
+class TestDisablePeriodicTaskCommand:
+    @pytest.fixture()
+    def enabled_task(self):
+        from django_celery_beat.models import IntervalSchedule, PeriodicTask
+
+        from django_beat_periodic.sync import MANAGED_DESCRIPTION
+
+        schedule, _ = IntervalSchedule.objects.get_or_create(
+            every=60, period=IntervalSchedule.SECONDS
+        )
+        return PeriodicTask.objects.create(
+            name="myapp.tasks.heartbeat",
+            task="myapp.tasks.heartbeat",
+            interval=schedule,
+            description=MANAGED_DESCRIPTION,
+            enabled=True,
+        )
+
+    def test_disables_an_enabled_task(self, enabled_task):
+        call_command("disable_periodic_task", enabled_task.name, stdout=StringIO())
+        enabled_task.refresh_from_db()
+        assert enabled_task.enabled is False
+
+    def test_prints_success_message(self, enabled_task):
+        out = StringIO()
+        call_command("disable_periodic_task", enabled_task.name, stdout=out)
+        assert "has been disabled" in out.getvalue()
+
+    def test_already_disabled_prints_warning_and_does_not_save(self, enabled_task):
+        # flip it to False first
+        enabled_task.enabled = False
+        enabled_task.save()
+
+        out = StringIO()
+        call_command("disable_periodic_task", enabled_task.name, stdout=out)
+        assert "already disabled" in out.getvalue()
+
+    def test_raises_command_error_for_unknown_task(self):
+        with pytest.raises(CommandError, match="not found"):
+            call_command("disable_periodic_task", "does.not.exist", stdout=StringIO())
+
+    def test_full_roundtrip(self, enabled_task):
+        # disable
+        call_command("disable_periodic_task", enabled_task.name, stdout=StringIO())
+        enabled_task.refresh_from_db()
+        assert enabled_task.enabled is False
+
+        # enable again
+        call_command("enable_periodic_task", enabled_task.name, stdout=StringIO())
+        enabled_task.refresh_from_db()
+        assert enabled_task.enabled is True
