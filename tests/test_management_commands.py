@@ -86,3 +86,111 @@ class TestListPeriodicTasksEmptyRegistry:
         out = StringIO()
         call_command("list_periodic_tasks", stdout=out)
         assert "No tasks registered" in out.getvalue()
+
+
+# ------------------------------------------------------------------ #
+# sync_periodic_tasks
+# ------------------------------------------------------------------ #
+
+
+@pytest.mark.django_db
+class TestSyncPeriodicTasksCommand:
+    @pytest.fixture(autouse=True)
+    def _setup(self, populated_registry):
+        pass
+
+    def _run(self, *args) -> str:
+        out = StringIO()
+        call_command("sync_periodic_tasks", *args, stdout=out)
+        return out.getvalue()
+
+    # ── real sync ─────────────────────────────────────────────────────
+
+    def test_sync_creates_db_rows(self):
+        from django_celery_beat.models import PeriodicTask
+
+        self._run()
+        assert PeriodicTask.objects.count() == 3
+
+    def test_sync_prints_success_message(self):
+        assert "synced successfully" in self._run()
+
+    def test_sync_is_idempotent(self, reset_sync_guard):
+        from django_celery_beat.models import PeriodicTask
+
+        self._run()
+        reset_sync_guard
+        self._run()
+        assert PeriodicTask.objects.count() == 3
+
+    # ── dry-run: no DB writes ──────────────────────────────────────────
+
+    def test_dry_run_writes_nothing_to_db(self):
+        from django_celery_beat.models import PeriodicTask
+
+        self._run("--dry-run")
+        assert PeriodicTask.objects.count() == 0
+
+    def test_dry_run_shows_create_for_every_new_task(self):
+        # all 3 tasks are in code but not in DB yet
+        assert self._run("--dry-run").count("[CREATE]") == 3
+
+    def test_dry_run_shows_delete_for_stale_managed_task(self):
+        from django_beat_periodic.sync import MANAGED_DESCRIPTION
+        from django_celery_beat.models import IntervalSchedule, PeriodicTask
+
+        # insert a managed task that no longer exists in the registry
+        schedule, _ = IntervalSchedule.objects.get_or_create(
+            every=60, period=IntervalSchedule.SECONDS
+        )
+        PeriodicTask.objects.create(
+            name="stale.task.ghost",
+            task="stale.task.ghost",
+            interval=schedule,
+            description=MANAGED_DESCRIPTION,
+        )
+
+        output = self._run("--dry-run")
+        assert "[DELETE]" in output
+        assert "stale.task.ghost" in output
+
+    def test_dry_run_ignores_manually_created_tasks(self):
+        from django_celery_beat.models import IntervalSchedule, PeriodicTask
+
+        # no MANAGED_DESCRIPTION — simulates a task created in the admin
+        schedule, _ = IntervalSchedule.objects.get_or_create(
+            every=120, period=IntervalSchedule.SECONDS
+        )
+        PeriodicTask.objects.create(
+            name="manual.task.untouched",
+            task="manual.task.untouched",
+            interval=schedule,
+        )
+
+        assert "manual.task.untouched" not in self._run("--dry-run")
+
+    def test_dry_run_shows_noop_for_already_synced_tasks(self, reset_sync_guard):
+        from django_beat_periodic.sync import sync_periodic_tasks
+
+        sync_periodic_tasks()
+        reset_sync_guard
+        assert "[NO-OP]" in self._run("--dry-run")
+
+    def test_dry_run_shows_update_when_field_drifted(self, reset_sync_guard):
+        from django_beat_periodic.sync import sync_periodic_tasks, MANAGED_DESCRIPTION
+        from django_celery_beat.models import PeriodicTask
+
+        sync_periodic_tasks()
+
+        # simulate someone toggling a task in the admin — next dry-run should catch it
+        PeriodicTask.objects.filter(description=MANAGED_DESCRIPTION).update(
+            enabled=True
+        )
+
+        reset_sync_guard
+        output = self._run("--dry-run")
+        assert "[UPDATE]" in output
+        assert "enabled" in output
+
+    def test_dry_run_prints_summary_line(self):
+        assert "Summary" in self._run("--dry-run")
