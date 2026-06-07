@@ -114,6 +114,21 @@ database. The Celery Beat scheduler picks them up immediately.
 2. When Django starts, `DjangoBeatPeriodicConfig.ready()` calls `sync_periodic_tasks()`.
 3. `sync_periodic_tasks()` iterates the registry and creates or updates `django_celery_beat` database objects, only writing when something actually changed.
 
+## Management Commands
+
+```bash
+python manage.py sync_periodic_tasks
+python manage.py sync_periodic_tasks --dry-run
+python manage.py list_periodic_tasks
+python manage.py list_periodic_tasks --all
+python manage.py enable_periodic_task <task-name>
+python manage.py disable_periodic_task <task-name>
+```
+
+`list_periodic_tasks` shows live database state. By default it lists only tasks managed by `django-beat-periodic`. Use `--all` to include every `django-celery-beat` periodic task; the output labels each task as `managed` or `unmanaged`.
+
+`enable_periodic_task` and `disable_periodic_task` are temporary database toggles. On the next sync or Django process restart, managed tasks are restored to the `enabled=` value declared on the decorator. To permanently change a managed task state, update the decorator and redeploy.
+
 ## Requirements 📋
 
 - Python ≥ 3.9

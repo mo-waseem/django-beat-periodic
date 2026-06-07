@@ -12,6 +12,12 @@ class BaseToggleCommand(BaseCommand):
     # Subclasses declare the desired state — no other changes needed.
     target_enabled: bool
 
+    temporary_override_warning = (
+        "WARNING: This is a temporary database override. On the next sync or Django "
+        "process restart, managed tasks return to the enabled= value declared "
+        "in the @periodic_task decorator."
+    )
+
     def add_arguments(self, parser):
         parser.add_argument(
             "task_name",
@@ -38,6 +44,7 @@ class BaseToggleCommand(BaseCommand):
                     f'Task "{task_name}" is already {state_label}. Nothing to do.'
                 )
             )
+            self.stdout.write(self.style.WARNING(self.temporary_override_warning))
             return
 
         task.enabled = target
@@ -47,3 +54,4 @@ class BaseToggleCommand(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(f'Task "{task_name}" has been {state_label}.')
         )
+        self.stdout.write(self.style.WARNING(self.temporary_override_warning))
