@@ -44,21 +44,25 @@ class Command(BaseCommand):
             self.style.WARNING("\nDRY RUN — no changes will be written.\n")
         )
 
+        from django_celery_beat.models import PeriodicTask
+
+        code_tasks = {resolve_task_name(e): e for e in PERIODIC_TASKS}
+
         try:
-            from django_celery_beat.models import PeriodicTask
-        except Exception:
+            db_tasks = {
+                t.name: t
+                for t in PeriodicTask.objects.filter(description=MANAGED_DESCRIPTION)
+            }
+        except Exception as exc:
             self.stderr.write(
                 self.style.ERROR(
-                    "Cannot import django_celery_beat models. Have you run migrations?"
+                    "Could not query the django_celery_beat PeriodicTask table.\n"
+                    "Have you run migrations?\n"
+                    f"  python manage.py migrate\n\n"
+                    f"Original error: {exc}"
                 )
             )
             return
-
-        code_tasks = {resolve_task_name(e): e for e in PERIODIC_TASKS}
-        db_tasks = {
-            t.name: t
-            for t in PeriodicTask.objects.filter(description=MANAGED_DESCRIPTION)
-        }
 
         to_create = sorted(set(code_tasks) - set(db_tasks))
         to_delete = sorted(set(db_tasks) - set(code_tasks))
